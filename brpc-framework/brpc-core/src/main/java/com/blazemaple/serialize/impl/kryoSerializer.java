@@ -34,7 +34,11 @@ public class kryoSerializer implements Serializer {
             Kryo kryo=kryoThreadLocal.get();
             kryo.writeObject(output,object);
             kryoThreadLocal.remove();
-            return output.toBytes();
+            byte[] result = output.toBytes();
+            if (log.isDebugEnabled()) {
+                log.debug("kryoSerializer serialize object 【{}】 success,object size:【{}】,serialized size:【{}】", object, object.toString().length(), result.length);
+            }
+            return result;
         } catch (IOException e) {
             log.error("kryoSerializer serialize object 【{}】 error",object,e);
             throw new SerializeException(e);
@@ -51,6 +55,9 @@ public class kryoSerializer implements Serializer {
             Kryo kryo=kryoThreadLocal.get();
             Object t = kryo.readObject(input, clazz);
             kryoThreadLocal.remove();
+            if (log.isDebugEnabled()) {
+                log.debug("kryoSerializer deserialize clazz 【{}】 success,serialized size:【{}】,object size:【{}】", clazz, bytes.length, t.toString().length());
+            }
             return clazz.cast(t);
         } catch (Exception e) {
             log.error("kryoSerializer deserialize clazz 【{}】 error",clazz,e);

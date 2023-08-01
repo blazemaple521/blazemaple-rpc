@@ -1,5 +1,7 @@
 package com.blazemaple.channel.handler;
 
+import com.blazemaple.compress.Compressor;
+import com.blazemaple.compress.CompressorFactory;
 import com.blazemaple.constant.RequestType;
 import com.blazemaple.serialize.Serializer;
 import com.blazemaple.serialize.SerializerFactory;
@@ -10,10 +12,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import lombok.extern.slf4j.Slf4j;
-
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
 
 /**
  * @author BlazeMaple
@@ -62,11 +60,13 @@ public class BrpcRequestDecoder extends LengthFieldBasedFrameDecoder {
         byte serializeType = byteBuf.readByte();
         byte compressType = byteBuf.readByte();
         long requestId = byteBuf.readLong();
+        long timestamp = byteBuf.readLong();
         BrpcRequest brpcRequest = BrpcRequest.builder()
             .requestId(requestId)
             .requestType(requestType)
             .serializeType(serializeType)
             .compressType(compressType)
+            .timeStamp(timestamp)
             .build();
 
         //todo 心跳请求没有payload，直接返回
@@ -77,12 +77,16 @@ public class BrpcRequestDecoder extends LengthFieldBasedFrameDecoder {
         int payloadLength = fullLength - headLength;
         byte[] payloadBytes = new byte[payloadLength];
         byteBuf.readBytes(payloadBytes);
-        //todo 解压缩
 
-        //反序列化
-        Serializer serializer = SerializerFactory.getSerializer(serializeType).getImpl();
-        RequestPayload requestPayload = serializer.deserialize(payloadBytes, RequestPayload.class);
-        brpcRequest.setRequestPayload(requestPayload);
+        if (payloadBytes!=null && payloadBytes.length>0){
+            Compressor compressor= CompressorFactory.getCompressor(compressType).getImpl();
+            payloadBytes = compressor.decompress(payloadBytes);
+
+            //反序列化
+            Serializer serializer = SerializerFactory.getSerializer(serializeType).getImpl();
+            RequestPayload requestPayload = serializer.deserialize(payloadBytes, RequestPayload.class);
+            brpcRequest.setRequestPayload(requestPayload);
+        }
 
         if (log.isDebugEnabled()) {
             log.debug("Decode request: 【{}】 finished", brpcRequest.getRequestId());

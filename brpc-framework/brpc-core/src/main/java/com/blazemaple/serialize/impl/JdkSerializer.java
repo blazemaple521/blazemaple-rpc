@@ -23,7 +23,11 @@ public class JdkSerializer implements Serializer {
         try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
             ObjectOutputStream outputStream = new ObjectOutputStream(byteArrayOutputStream)) {
             outputStream.writeObject(object);
-            return byteArrayOutputStream.toByteArray();
+            byte[] result = byteArrayOutputStream.toByteArray();
+            if (log.isDebugEnabled()) {
+                log.debug("JdkSerializer serialize object 【{}】 success,object size:【{}】,serialized size:【{}】", object, object.toString().length(), result.length);
+            }
+            return result;
         } catch (IOException e) {
             log.error("JdkSerializer serialize object 【{}】 error",object,e);
             throw new SerializeException(e);
@@ -41,6 +45,9 @@ public class JdkSerializer implements Serializer {
             ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayOutputStream);
         ) {
             Object object = objectInputStream.readObject();
+            if (log.isDebugEnabled()) {
+                log.debug("JdkSerializer deserialize clazz 【{}】 success,serialized size:【{}】,object size:【{}】", clazz, bytes.length, object.toString().length());
+            }
             return (T)object;
         } catch (IOException | ClassNotFoundException e) {
             log.error("JdkSerializer deserialize clazz 【{}】 error",clazz,e);

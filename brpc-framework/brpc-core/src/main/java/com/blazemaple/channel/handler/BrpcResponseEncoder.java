@@ -1,5 +1,7 @@
 package com.blazemaple.channel.handler;
 
+import com.blazemaple.compress.Compressor;
+import com.blazemaple.compress.CompressorFactory;
 import com.blazemaple.serialize.Serializer;
 import com.blazemaple.serialize.SerializerFactory;
 import com.blazemaple.transport.message.BrpcRequest;
@@ -53,9 +55,17 @@ public class BrpcResponseEncoder extends MessageToByteEncoder<BrpcResponse> {
         byteBuf.writeByte(brpcResponse.getSerializeType());
         byteBuf.writeByte(brpcResponse.getCompressType());
         byteBuf.writeLong(brpcResponse.getRequestId());
+        byteBuf.writeLong(brpcResponse.getTimeStamp());
 
-        Serializer serializer = SerializerFactory.getSerializer(brpcResponse.getSerializeType()).getImpl();
-        byte[] bodyBytes = serializer.serialize(brpcResponse.getBody());
+        byte[] bodyBytes=null;
+        if (brpcResponse.getBody()!=null){
+            Serializer serializer = SerializerFactory.getSerializer(brpcResponse.getSerializeType()).getImpl();
+            bodyBytes = serializer.serialize(brpcResponse.getBody());
+
+            Compressor compressor= CompressorFactory.getCompressor(brpcResponse.getCompressType()).getImpl();
+            bodyBytes = compressor.compress(bodyBytes);
+        }
+
         if (bodyBytes !=null){
             byteBuf.writeBytes(bodyBytes);
         }

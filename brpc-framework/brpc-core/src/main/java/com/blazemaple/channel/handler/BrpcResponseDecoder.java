@@ -1,5 +1,7 @@
 package com.blazemaple.channel.handler;
 
+import com.blazemaple.compress.Compressor;
+import com.blazemaple.compress.CompressorFactory;
 import com.blazemaple.constant.RequestType;
 import com.blazemaple.serialize.Serializer;
 import com.blazemaple.serialize.SerializerFactory;
@@ -63,22 +65,28 @@ public class BrpcResponseDecoder extends LengthFieldBasedFrameDecoder {
         byte serializeType = byteBuf.readByte();
         byte compressType = byteBuf.readByte();
         long requestId = byteBuf.readLong();
+        long timestamp = byteBuf.readLong();
         BrpcResponse brpcResponse = BrpcResponse.builder()
             .requestId(requestId)
             .serializeType(serializeType)
             .compressType(compressType)
             .code(responseCode)
+            .timeStamp(timestamp)
             .build();
 
         int payloadLength = fullLength - headLength;
         byte[] payloadBytes = new byte[payloadLength];
         byteBuf.readBytes(payloadBytes);
-        //todo 解压缩
 
-        //反序列化
-        Serializer serializer = SerializerFactory.getSerializer(serializeType).getImpl();
-        Object body = serializer.deserialize(payloadBytes, Object.class);
-        brpcResponse.setBody(body);
+       if(payloadBytes!=null && payloadBytes.length>0){
+           Compressor compressor= CompressorFactory.getCompressor(compressType).getImpl();
+           payloadBytes = compressor.decompress(payloadBytes);
+
+           //反序列化
+           Serializer serializer = SerializerFactory.getSerializer(serializeType).getImpl();
+           Object body = serializer.deserialize(payloadBytes, Object.class);
+           brpcResponse.setBody(body);
+       }
         if (log.isDebugEnabled()) {
             log.debug("Decode response: 【{}】 finished", brpcResponse.getRequestId());
         }

@@ -31,6 +31,9 @@ public class HessianSerializer implements Serializer {
             hessian2Output.writeObject(object);
             hessian2Output.flush();
             byte[] result = baos.toByteArray();
+            if (log.isDebugEnabled()) {
+                log.debug("HessianSerializer serialize object 【{}】 success,object size:【{}】,serialized size:【{}】", object, object.toString().length(), result.length);
+            }
             return result;
         } catch (IOException e) {
             log.error("HessianSerializer serialize object 【{}】 error",object,e);
@@ -49,6 +52,9 @@ public class HessianSerializer implements Serializer {
 
             Hessian2Input hessian2Input = new Hessian2Input(bais);
             T t = (T) hessian2Input.readObject();
+            if (log.isDebugEnabled()) {
+                log.debug("HessianSerializer deserialize clazz 【{}】 success,serialized size:【{}】,object size:【{}】", clazz, bytes.length, t.toString().length());
+            }
             return t;
         } catch (IOException  e) {
             log.error("HessianSerializer deserialize clazz 【{}】 error",clazz,e);

@@ -18,6 +18,9 @@ public class JsonSerializer implements Serializer {
             return null;
         }
         byte[] result = JSON.toJSONBytes(object);
+        if (log.isDebugEnabled()) {
+            log.debug("JsonSerializer serialize object 【{}】 success,object size:【{}】,serialized size:【{}】", object, object.toString().length(), result.length);
+        }
         return result;
     }
 
@@ -27,6 +30,9 @@ public class JsonSerializer implements Serializer {
             return null;
         }
         T t = JSON.parseObject(bytes, clazz);
+        if (log.isDebugEnabled()) {
+            log.debug("JsonSerializer deserialize clazz 【{}】 success,serialized size:【{}】,object size:【{}】", clazz, bytes.length, t.toString().length());
+        }
         return t;
     }
 }

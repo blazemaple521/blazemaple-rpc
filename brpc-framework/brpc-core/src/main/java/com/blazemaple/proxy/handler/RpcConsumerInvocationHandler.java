@@ -2,6 +2,7 @@ package com.blazemaple.proxy.handler;
 
 import com.blazemaple.BrpcBootstrap;
 import com.blazemaple.NettyBootstrapInitializer;
+import com.blazemaple.compress.CompressorFactory;
 import com.blazemaple.constant.RequestType;
 import com.blazemaple.discovery.Registry;
 import com.blazemaple.exceptions.DiscoveryException;
@@ -42,18 +43,6 @@ public class RpcConsumerInvocationHandler implements InvocationHandler {
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         log.debug("invoke method");
-        //从注册中心获取服务地址 ip+port
-        //todo 1.每次调用相关方法的时候都需要从注册中心获取服务列表吗？==> 本地缓存+watcher
-        //     2.我们如何合理的选择一个可用的服务地址？ ==> 负载均衡
-        List<InetSocketAddress> addressList = registry.lookup(interfaceRef.getName());
-        if (log.isDebugEnabled()) {
-            log.debug("service consumer find service【{}】and it's ip is【{}】", interfaceRef.getName(),
-                addressList);
-        }
-        Channel channel = getAvailableChannel(addressList.get(0));
-        if (log.isDebugEnabled()) {
-            log.debug("get channel success with address【{}】", addressList.get(0));
-        }
         //封装报文
         RequestPayload requestPayload = RequestPayload.builder()
             .interfaceName(interfaceRef.getName())
@@ -65,22 +54,36 @@ public class RpcConsumerInvocationHandler implements InvocationHandler {
 
         BrpcRequest brpcRequest = BrpcRequest.builder()
             .requestId(BrpcBootstrap.ID_GENERATOR.getId())
-            .compressType((byte) 1)
+            .compressType(CompressorFactory.getCompressor(BrpcBootstrap.COMPRESS_TYPE).getCode())
             .serializeType(SerializerFactory.getSerializer(BrpcBootstrap.SERIALIZE_TYPE).getCode())
             .requestType(RequestType.REQUEST.getId())
+            .timeStamp(System.currentTimeMillis())
             .requestPayload(requestPayload)
             .build();
 
+        BrpcBootstrap.REQUEST_THREAD_LOCAL.set(brpcRequest);
+
+        InetSocketAddress address = BrpcBootstrap.LOAD_BALANCER.selectServiceAddress(interfaceRef.getName());
+        if (log.isDebugEnabled()) {
+            log.debug("service consumer find service【{}】and it's ip is【{}】", interfaceRef.getName(),
+                address);
+        }
+        Channel channel = getAvailableChannel(address);
+        if (log.isDebugEnabled()) {
+            log.debug("get channel success with address【{}】", address);
+        }
         //同步策略
         CompletableFuture<Object> completableFuture = new CompletableFuture<>();
-        BrpcBootstrap.PENDING_REQUEST.put(1L, completableFuture);
+        BrpcBootstrap.PENDING_REQUEST.put(brpcRequest.getRequestId(), completableFuture);
         channel.writeAndFlush(brpcRequest)
             .addListener((ChannelFutureListener) promise -> {
                 if (!promise.isSuccess()) {
-                    log.error("send message to server【{}】failed", addressList.get(0));
+                    log.error("send message to server【{}】failed", address);
                     completableFuture.completeExceptionally(promise.cause());
                 }
             });
+
+        BrpcBootstrap.REQUEST_THREAD_LOCAL.remove();
 
         return completableFuture.get(10, TimeUnit.SECONDS);
     }

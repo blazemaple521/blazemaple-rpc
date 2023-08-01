@@ -21,6 +21,8 @@ public class BrpcRequest {
     private byte compressType;
     private byte serializeType;
 
+    private long timeStamp;
+
     private RequestPayload requestPayload;
 
 }

@@ -3,24 +3,28 @@ package com.blazemaple;
 import com.blazemaple.channel.handler.BrpcRequestDecoder;
 import com.blazemaple.channel.handler.BrpcResponseEncoder;
 import com.blazemaple.channel.handler.MethodCallHandler;
+import com.blazemaple.core.HeartbeatDetector;
 import com.blazemaple.discovery.Registry;
 import com.blazemaple.discovery.RegistryConfig;
+import com.blazemaple.loadbalancer.LoadBalancer;
+import com.blazemaple.loadbalancer.impl.ConsistentHashBalancer;
+import com.blazemaple.loadbalancer.impl.RoundRobinLoadBalancer;
+import com.blazemaple.transport.message.BrpcRequest;
 import com.blazemaple.utils.IdGenerator;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelInitializer;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LoggingHandler;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.zookeeper.ZooKeeper;
 
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,6 +35,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Slf4j
 public class BrpcBootstrap {
+
+    public static int PORT=8092;
 
     //BrpcBootstrap是一个单例，每个应用程序只有一个实例
 
@@ -43,19 +49,25 @@ public class BrpcBootstrap {
 
     public static final IdGenerator ID_GENERATOR = new IdGenerator(1,2);
 
+    // 保存request对象，可以到当前线程中随时获取
+    public static final ThreadLocal<BrpcRequest> REQUEST_THREAD_LOCAL = new ThreadLocal<>();
+
     //维护已发布且暴露的服务列表
     public static final Map<String, ServiceConfig<?>> SERVICE_LIST = new ConcurrentHashMap<>(16);
     //缓存channel
     public static final Map<InetSocketAddress, Channel> CHANNEL_CACHE = new ConcurrentHashMap<>(16);
+    public final static TreeMap<Long, Channel> ANSWER_TIME_CHANNEL_CACHE = new TreeMap<>();
     // 定义全局的对外挂起的 completableFuture
     public final static Map<Long, CompletableFuture<Object>> PENDING_REQUEST = new ConcurrentHashMap<>(128);
 
     //todo 待处理
     private Registry registry;
 
-    private int port = 8088;
+    public static LoadBalancer LOAD_BALANCER;
 
     public static String SERIALIZE_TYPE = "jdk";
+
+    public static String COMPRESS_TYPE = "gzip";
 
 
     private BrpcBootstrap() {
@@ -88,6 +100,7 @@ public class BrpcBootstrap {
 
     public BrpcBootstrap registry(RegistryConfig registryConfig) {
         this.registry = registryConfig.getRegistry();
+        BrpcBootstrap.LOAD_BALANCER=new ConsistentHashBalancer();
         return this;
     }
 
@@ -154,8 +167,7 @@ public class BrpcBootstrap {
                             .addLast(new BrpcResponseEncoder());
                     }
                 });
-            ChannelFuture channelFuture = serverBootstrap.bind(port).sync();
-            System.out.println("server started and listen " + channelFuture.channel().localAddress());
+            ChannelFuture channelFuture = serverBootstrap.bind(PORT).sync();
             channelFuture.channel().closeFuture().sync();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -171,7 +183,7 @@ public class BrpcBootstrap {
 
 
     public BrpcBootstrap reference(ReferenceConfig<?> reference) {
-        //todo 引用服务
+        HeartbeatDetector.detectHeartbeat(reference.getInterface().getName());
         reference.setRegistry(registry);
         return this;
     }
@@ -188,5 +200,22 @@ public class BrpcBootstrap {
             log.debug("set serializeType:【{}】", serializeType);
         }
         return this;
+    }
+
+    /**
+     * 设置压缩协议
+     * @param compressType 压缩方式
+     * @return this
+     */
+    public BrpcBootstrap compressor(String compressType) {
+        COMPRESS_TYPE = compressType;
+        if (log.isDebugEnabled()) {
+            log.debug("set compressType:【{}】", compressType);
+        }
+        return this;
+    }
+
+    public Registry getRegistry() {
+        return registry;
     }
 }

@@ -21,7 +21,7 @@ public class MySimpleChannelInboundHandler extends SimpleChannelInboundHandler<B
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, BrpcResponse brpcResponse) throws Exception {
         Object returnValue = brpcResponse.getBody();
-        CompletableFuture<Object> completableFuture = BrpcBootstrap.PENDING_REQUEST.get(1L);
+        CompletableFuture<Object> completableFuture = BrpcBootstrap.PENDING_REQUEST.get(brpcResponse.getRequestId());
         completableFuture.complete(returnValue);
     }
 }

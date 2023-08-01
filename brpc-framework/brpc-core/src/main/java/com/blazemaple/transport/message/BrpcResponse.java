@@ -20,8 +20,8 @@ public class BrpcResponse {
 
     private byte compressType;
     private byte serializeType;
-
     private byte code;
+    private long timeStamp;
 
     private Object body;
 

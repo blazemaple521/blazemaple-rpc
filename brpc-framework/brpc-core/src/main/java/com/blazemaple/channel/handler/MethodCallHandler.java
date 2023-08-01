@@ -2,6 +2,7 @@ package com.blazemaple.channel.handler;
 
 import com.blazemaple.BrpcBootstrap;
 import com.blazemaple.ServiceConfig;
+import com.blazemaple.constant.RequestType;
 import com.blazemaple.constant.RespCode;
 import com.blazemaple.transport.message.BrpcRequest;
 import com.blazemaple.transport.message.BrpcResponse;
@@ -23,16 +24,21 @@ public class MethodCallHandler extends SimpleChannelInboundHandler<BrpcRequest> 
 
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, BrpcRequest brpcRequest) throws Exception {
+
         RequestPayload requestPayload = brpcRequest.getRequestPayload();
-        Object object = callTargetMethod(requestPayload);
-        if (log.isDebugEnabled()) {
-            log.debug("Call request: 【{}】 finished", brpcRequest.getRequestId());
+        Object object = null;
+        if(brpcRequest.getRequestType() != RequestType.HEART_BEAT.getId()){
+            object = callTargetMethod(requestPayload);
+            if (log.isDebugEnabled()) {
+                log.debug("Call request: 【{}】 finished", brpcRequest.getRequestId());
+            }
         }
         BrpcResponse brpcResponse = BrpcResponse.builder()
             .requestId(brpcRequest.getRequestId())
             .serializeType(brpcRequest.getSerializeType())
             .compressType(brpcRequest.getCompressType())
             .code(RespCode.SUCCESS.getCode())
+            .timeStamp(System.currentTimeMillis())
             .body(object)
             .build();
         channelHandlerContext.channel().writeAndFlush(brpcResponse);

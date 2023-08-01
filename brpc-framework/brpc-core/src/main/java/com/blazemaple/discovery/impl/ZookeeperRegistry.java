@@ -1,5 +1,6 @@
 package com.blazemaple.discovery.impl;
 
+import com.blazemaple.BrpcBootstrap;
 import com.blazemaple.ServiceConfig;
 import com.blazemaple.constant.BrpcConstant;
 import com.blazemaple.discovery.AbstractRegistry;
@@ -41,7 +42,7 @@ public class ZookeeperRegistry extends AbstractRegistry {
         }
         //服务地址结点，临时结点
         //todo 端口问题
-        String childNode = parentNode + "/" + NetUtils.getIp() + ":" + 8088;
+        String childNode = parentNode + "/" + NetUtils.getIp() + ":" + BrpcBootstrap.PORT;
         if (!ZookeeperUtils.exists(zooKeeper, childNode, null)) {
             ZookeeperNode zookeeperNode = new ZookeeperNode(childNode, null);
             ZookeeperUtils.createNode(zooKeeper, zookeeperNode, null, CreateMode.EPHEMERAL);
@@ -62,7 +63,7 @@ public class ZookeeperRegistry extends AbstractRegistry {
             return new InetSocketAddress(ip, port);
         }).toList();
         if (inetSocketAddress.size()==0){
-            throw new DiscoveryException("未发现任何可用的服务主机");
+            throw new DiscoveryException("no service provider");
         }
         return inetSocketAddress;
     }
