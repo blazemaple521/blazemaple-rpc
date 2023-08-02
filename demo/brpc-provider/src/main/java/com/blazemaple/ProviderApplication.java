@@ -9,6 +9,7 @@ import com.blazemaple.impl.HelloBRPCImpl;
  * @description
  * @date 2023/7/20 1:38
  */
+
 public class ProviderApplication {
 
     public static void main(String[] args) {

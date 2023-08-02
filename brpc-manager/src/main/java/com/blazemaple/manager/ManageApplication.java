@@ -2,7 +2,6 @@ package com.blazemaple.manager;
 
 import com.blazemaple.utils.zookeeper.ZookeeperNode;
 import com.blazemaple.utils.zookeeper.ZookeeperUtils;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooKeeper;
 
@@ -17,7 +16,7 @@ public class ManageApplication {
 
     public static void main(String[] args) throws InterruptedException {
         // 帮我们创建基础目录
-        // yrpc-metadata   (持久节点)
+        // brpc-metadata   (持久节点)
         //  └─ providers （持久节点）
         //  		└─ service1  （持久节点，接口的全限定名）
         //  		    ├─ node1 [data]     /ip:port
