@@ -1,7 +1,6 @@
 package com.blazemaple;
 
 import com.blazemaple.api.service.HelloBRPC;
-import com.blazemaple.core.HeartbeatDetector;
 import com.blazemaple.discovery.RegistryConfig;
 import lombok.extern.slf4j.Slf4j;
 
@@ -22,12 +21,21 @@ public class ConsumerApplication {
             .registry(new RegistryConfig("zookeeper://127.0.0.1:2181"))
             .serializer("jdk")
             .compressor("gzip")
+            .group("test")
             .reference(reference);
 
         HelloBRPC helloBRPC = reference.get();
-        for (int i=0;i<10;i++){
-            String blazemaple = helloBRPC.sayHello("blazemaple");
-            log.info("sayHello result:{}",blazemaple);
+        while (true){
+            try {
+                Thread.sleep(10000);
+                System.out.println("=======================================================================================");
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            for (int i=0;i<15;i++){
+                String blazemaple = helloBRPC.sayHello("blazemaple");
+                log.info("sayHello result:{}",blazemaple);
+            }
         }
     }
 }

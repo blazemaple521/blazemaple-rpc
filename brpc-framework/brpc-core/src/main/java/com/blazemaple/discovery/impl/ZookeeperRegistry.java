@@ -8,6 +8,7 @@ import com.blazemaple.exceptions.DiscoveryException;
 import com.blazemaple.utils.NetUtils;
 import com.blazemaple.utils.zookeeper.ZookeeperNode;
 import com.blazemaple.utils.zookeeper.ZookeeperUtils;
+import com.blazemaple.watcher.UpAndDownWatcher;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooKeeper;
@@ -40,9 +41,14 @@ public class ZookeeperRegistry extends AbstractRegistry {
             ZookeeperNode zookeeperNode = new ZookeeperNode(parentNode, null);
             ZookeeperUtils.createNode(zooKeeper, zookeeperNode, null, CreateMode.PERSISTENT);
         }
+        // 建立分组节点
+        parentNode = parentNode + "/" + service.getGroup();
+        if(!ZookeeperUtils.exists(zooKeeper,parentNode,null)){
+            ZookeeperNode zookeeperNode = new ZookeeperNode(parentNode,null);
+            ZookeeperUtils.createNode(zooKeeper, zookeeperNode, null, CreateMode.PERSISTENT);
+        }
         //服务地址结点，临时结点
-        //todo 端口问题
-        String childNode = parentNode + "/" + NetUtils.getIp() + ":" + BrpcBootstrap.PORT;
+        String childNode = parentNode + "/" + NetUtils.getIp() + ":" + BrpcBootstrap.getInstance().getConfiguration().getPort();
         if (!ZookeeperUtils.exists(zooKeeper, childNode, null)) {
             ZookeeperNode zookeeperNode = new ZookeeperNode(childNode, null);
             ZookeeperUtils.createNode(zooKeeper, zookeeperNode, null, CreateMode.EPHEMERAL);
@@ -53,9 +59,9 @@ public class ZookeeperRegistry extends AbstractRegistry {
     }
 
     @Override
-    public List<InetSocketAddress> lookup(String serviceName) {
-        String serviceNode = BrpcConstant.BASE_PROVIDERS_PATH + "/" + serviceName;
-        List<String> children = ZookeeperUtils.getChildren(zooKeeper, serviceNode, null);
+    public List<InetSocketAddress>  lookup(String serviceName, String group) {
+        String serviceNode = BrpcConstant.BASE_PROVIDERS_PATH + "/" + serviceName+ "/"+ group;
+        List<String> children = ZookeeperUtils.getChildren(zooKeeper, serviceNode, new UpAndDownWatcher());
         List<InetSocketAddress> inetSocketAddress = children.stream().map(ipString -> {
             String[] ipAndPort = ipString.split(":");
             String ip = ipAndPort[0];

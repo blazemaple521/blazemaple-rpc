@@ -1,16 +1,15 @@
 package com.blazemaple;
 
+import com.blazemaple.annotation.BrpcService;
 import com.blazemaple.channel.handler.BrpcRequestDecoder;
 import com.blazemaple.channel.handler.BrpcResponseEncoder;
 import com.blazemaple.channel.handler.MethodCallHandler;
+import com.blazemaple.config.Configuration;
+import com.blazemaple.core.BrpcShutdownHook;
 import com.blazemaple.core.HeartbeatDetector;
-import com.blazemaple.discovery.Registry;
 import com.blazemaple.discovery.RegistryConfig;
 import com.blazemaple.loadbalancer.LoadBalancer;
-import com.blazemaple.loadbalancer.impl.ConsistentHashBalancer;
-import com.blazemaple.loadbalancer.impl.RoundRobinLoadBalancer;
 import com.blazemaple.transport.message.BrpcRequest;
-import com.blazemaple.utils.IdGenerator;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -21,12 +20,17 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LoggingHandler;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.File;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
+import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * @author BlazeMaple
@@ -36,18 +40,12 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class BrpcBootstrap {
 
-    public static int PORT=8092;
-
     //BrpcBootstrap是一个单例，每个应用程序只有一个实例
 
-    private static BrpcBootstrap brpcBootstrap = new BrpcBootstrap();
+    private static final BrpcBootstrap brpcBootstrap = new BrpcBootstrap();
 
-    //相关基础配置
-    private String applicationName = "default";
-    private RegistryConfig registryConfig;
-    private ProtocolConfig protocolConfig;
-
-    public static final IdGenerator ID_GENERATOR = new IdGenerator(1,2);
+    //全局的基础配置
+    private final Configuration configuration;
 
     // 保存request对象，可以到当前线程中随时获取
     public static final ThreadLocal<BrpcRequest> REQUEST_THREAD_LOCAL = new ThreadLocal<>();
@@ -60,18 +58,9 @@ public class BrpcBootstrap {
     // 定义全局的对外挂起的 completableFuture
     public final static Map<Long, CompletableFuture<Object>> PENDING_REQUEST = new ConcurrentHashMap<>(128);
 
-    //todo 待处理
-    private Registry registry;
-
-    public static LoadBalancer LOAD_BALANCER;
-
-    public static String SERIALIZE_TYPE = "jdk";
-
-    public static String COMPRESS_TYPE = "gzip";
-
 
     private BrpcBootstrap() {
-        //todo 构造启动引导程序，需要初始化一些参数
+        configuration = new Configuration();
     }
 
     public static BrpcBootstrap getInstance() {
@@ -87,7 +76,7 @@ public class BrpcBootstrap {
 
     public BrpcBootstrap application(String applicationName) {
         //todo 设置应用程序名称
-        this.applicationName = applicationName;
+        configuration.setApplicationName(applicationName);
         return this;
     }
 
@@ -99,25 +88,22 @@ public class BrpcBootstrap {
      */
 
     public BrpcBootstrap registry(RegistryConfig registryConfig) {
-        this.registry = registryConfig.getRegistry();
-        BrpcBootstrap.LOAD_BALANCER=new ConsistentHashBalancer();
+        configuration.setRegistryConfig(registryConfig);
+
         return this;
     }
 
     /**
-     * 设置协议
+     * 配置负载均衡策略
      *
-     * @param protocolConfig 协议配置
-     * @return this
+     * @param loadBalancer 注册中心
+     * @return this当前实例
      */
-    public BrpcBootstrap protocol(ProtocolConfig protocolConfig) {
-        if (log.isDebugEnabled()) {
-            log.debug("set protocolConfig:{}", protocolConfig.toString());
-        }
-        //todo 设置序列化协议
-        this.protocolConfig = protocolConfig;
+    public BrpcBootstrap loadBalancer(LoadBalancer loadBalancer) {
+        configuration.setLoadBalancer(loadBalancer);
         return this;
     }
+
 
     /**
      * 发布服务
@@ -127,8 +113,7 @@ public class BrpcBootstrap {
      */
 
     public BrpcBootstrap publish(ServiceConfig<?> service) {
-        //todo 发布服务
-        registry.register(service);
+        configuration.getRegistryConfig().getRegistry().register(service);
         SERVICE_LIST.put(service.getInterface().getName(), service);
         return this;
     }
@@ -140,7 +125,6 @@ public class BrpcBootstrap {
      * @return this
      */
     public BrpcBootstrap publish(List<ServiceConfig<?>> services) {
-        //todo 发布服务
         for (ServiceConfig<?> service : services) {
             this.publish(service);
         }
@@ -151,7 +135,8 @@ public class BrpcBootstrap {
      * 启动引导程序
      */
     public void start() {
-        //todo 启动引导程序
+        Runtime.getRuntime().addShutdownHook(new BrpcShutdownHook());
+
         NioEventLoopGroup boss = new NioEventLoopGroup(2);
         NioEventLoopGroup worker = new NioEventLoopGroup(10);
         try {
@@ -167,7 +152,7 @@ public class BrpcBootstrap {
                             .addLast(new BrpcResponseEncoder());
                     }
                 });
-            ChannelFuture channelFuture = serverBootstrap.bind(PORT).sync();
+            ChannelFuture channelFuture = serverBootstrap.bind(configuration.getPort()).sync();
             channelFuture.channel().closeFuture().sync();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -184,18 +169,20 @@ public class BrpcBootstrap {
 
     public BrpcBootstrap reference(ReferenceConfig<?> reference) {
         HeartbeatDetector.detectHeartbeat(reference.getInterface().getName());
-        reference.setRegistry(registry);
+        reference.setRegistry(configuration.getRegistryConfig().getRegistry());
+        reference.setGroup(configuration.getGroup());
         return this;
     }
 
     /**
      * 设置序列化协议
+     *
      * @param serializeType 序列化方式
      * @return this
      */
 
     public BrpcBootstrap serializer(String serializeType) {
-        SERIALIZE_TYPE = serializeType;
+        configuration.setSerializeType(serializeType);
         if (log.isDebugEnabled()) {
             log.debug("set serializeType:【{}】", serializeType);
         }
@@ -204,18 +191,123 @@ public class BrpcBootstrap {
 
     /**
      * 设置压缩协议
+     *
      * @param compressType 压缩方式
      * @return this
      */
     public BrpcBootstrap compressor(String compressType) {
-        COMPRESS_TYPE = compressType;
+        configuration.setCompressType(compressType);
         if (log.isDebugEnabled()) {
             log.debug("set compressType:【{}】", compressType);
         }
         return this;
     }
 
-    public Registry getRegistry() {
-        return registry;
+
+    /**
+     * 扫描包
+     *
+     * @param packageName 包名
+     * @return this
+     */
+    public BrpcBootstrap scan(String packageName) {
+        List<String> classNames = getAllClassNames(packageName);
+        List<Class<?>> classes = classNames.stream().map(className -> {
+                try {
+                    return Class.forName(className);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
+            }).filter(clazz -> clazz.getAnnotation(BrpcService.class) != null)
+            .collect(Collectors.toList());
+
+        for (Class<?> clazz : classes) {
+            Class<?>[] interfaces = clazz.getInterfaces();
+            Object instance = null;
+            try {
+                instance = clazz.getConstructor().newInstance();
+            } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
+                     NoSuchMethodException e) {
+                throw new RuntimeException(e);
+            }
+            BrpcService brpcService = clazz.getAnnotation(BrpcService.class);
+            String group = brpcService.group();
+
+            for (Class<?> anInterface : interfaces) {
+                ServiceConfig<?> serviceConfig = new ServiceConfig<>();
+                serviceConfig.setInterface(anInterface);
+                serviceConfig.setRef(instance);
+                serviceConfig.setGroup(group);
+                if (log.isDebugEnabled()) {
+                    log.debug("Service【{}】has been published through package scanning.", anInterface);
+                }
+                // 3、发布
+                publish(serviceConfig);
+            }
+        }
+        return this;
+    }
+
+    private List<String> getAllClassNames(String packageName) {
+        String basePath = packageName.replaceAll("\\.", "/");
+        URL url = ClassLoader.getSystemClassLoader().getResource(basePath);
+        if (url == null) {
+            throw new RuntimeException("包扫描时，发现路径不存在.");
+        }
+        String absolutePath = url.getPath();
+        //
+        List<String> classNames = new ArrayList<>();
+        classNames = recursionFile(absolutePath, classNames, basePath);
+
+        return classNames;
+    }
+
+    private List<String> recursionFile(String absolutePath, List<String> classNames, String basePath) {
+        // 获取文件
+        File file = new File(absolutePath);
+        // 判断文件是否是文件夹
+        if (file.isDirectory()) {
+            // 找到文件夹的所有的文件
+            File[] children = file.listFiles(
+                pathname -> pathname.isDirectory() || pathname.getPath().contains(".class"));
+            if (children == null || children.length == 0) {
+                return classNames;
+            }
+            for (File child : children) {
+                if (child.isDirectory()) {
+                    // 递归调用
+                    recursionFile(child.getAbsolutePath(), classNames, basePath);
+                } else {
+                    // 文件 --> 类的权限定名称
+                    String className = getClassNameByAbsolutePath(child.getAbsolutePath(), basePath);
+                    classNames.add(className);
+                }
+            }
+
+        } else {
+            // 文件 --> 类的权限定名称
+            String className = getClassNameByAbsolutePath(absolutePath, basePath);
+            classNames.add(className);
+        }
+        return classNames;
+    }
+
+    private String getClassNameByAbsolutePath(String absolutePath, String basePath) {
+        String fileName = absolutePath
+            .substring(absolutePath.indexOf(basePath.replaceAll("/", "\\\\")))
+            .replaceAll("\\\\", ".");
+
+        fileName = fileName.substring(0, fileName.indexOf(".class"));
+        return fileName;
+    }
+
+
+    public Configuration getConfiguration() {
+        return configuration;
+    }
+
+    public BrpcBootstrap group(String group) {
+        configuration.setGroup(group);
+        return this;
     }
 }

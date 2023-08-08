@@ -1,0 +1,4 @@
+1-jdk-com.blazemaple.serialize.impl.JdkSerializer
+2-json-com.blazemaple.serialize.impl.JsonSerializer
+3-hessian-com.blazemaple.serialize.impl.HessianSerializer
+4-kryo-com.blazemaple.serialize.impl.kryoSerializer

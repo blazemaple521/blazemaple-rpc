@@ -30,6 +30,7 @@
         <hession.version>4.0.66</hession.version>
         <kryo.version>5.3.0</kryo.version>
         <commons-compress.version>1.21</commons-compress.version>
+        <spring.version>6.0.11</spring.version>
     </properties>
 
     <dependencyManagement>
@@ -91,8 +92,11 @@
                 <artifactId>commons-compress</artifactId>
                 <version>${commons-compress.version}</version>
             </dependency>
-
-
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-context</artifactId>
+                <version>${spring.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 </project>

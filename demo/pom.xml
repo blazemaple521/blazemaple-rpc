@@ -15,6 +15,8 @@
         <module>brpc-provider</module>
         <module>brpc-consumer</module>
         <module>brpc-api</module>
+        <module>brpc-springboot-provider</module>
+        <module>brpc-springboot-consumer</module>
     </modules>
 
     <properties>

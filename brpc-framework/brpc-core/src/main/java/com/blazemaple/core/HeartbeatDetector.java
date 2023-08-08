@@ -27,8 +27,9 @@ import java.util.concurrent.TimeoutException;
 public class HeartbeatDetector {
 
     public static void detectHeartbeat(String serviceName){
-        Registry registry = BrpcBootstrap.getInstance().getRegistry();
-        List<InetSocketAddress> socketAddresses = registry.lookup(serviceName);
+        Registry registry = BrpcBootstrap.getInstance().getConfiguration().getRegistryConfig().getRegistry();
+        String group = BrpcBootstrap.getInstance().getConfiguration().getGroup();
+        List<InetSocketAddress> socketAddresses = registry.lookup(serviceName,group);
         for (InetSocketAddress address : socketAddresses) {
             try {
                 if (!BrpcBootstrap.CHANNEL_CACHE.containsKey(address)){
@@ -68,10 +69,10 @@ public class HeartbeatDetector {
                     long start = System.currentTimeMillis();
                     // 构建一个心跳请求
                     BrpcRequest brpcRequest = BrpcRequest.builder()
-                        .requestId(BrpcBootstrap.ID_GENERATOR.getId())
-                        .compressType(CompressorFactory.getCompressor(BrpcBootstrap.COMPRESS_TYPE).getCode())
+                        .requestId(BrpcBootstrap.getInstance().getConfiguration().getIdGenerator().getId())
+                        .compressType(CompressorFactory.getCompressor(BrpcBootstrap.getInstance().getConfiguration().getCompressType()).getCode())
                         .requestType(RequestType.HEART_BEAT.getId())
-                        .serializeType(SerializerFactory.getSerializer(BrpcBootstrap.SERIALIZE_TYPE).getCode())
+                        .serializeType(SerializerFactory.getSerializer(BrpcBootstrap.getInstance().getConfiguration().getSerializeType()).getCode())
                         .timeStamp(start)
                         .build();
 
@@ -86,7 +87,7 @@ public class HeartbeatDetector {
                         }
                     });
 
-                    Long endTime = 0L;
+                    long endTime;
                     try {
                         // 阻塞方法，get()方法如果得不到结果，就会一直阻塞
                         // 我们想不一直阻塞可以添加参数
@@ -122,7 +123,9 @@ public class HeartbeatDetector {
                 }
             }
 
-            log.info("-----------------------响应时间的treemap----------------------");
+            if (log.isDebugEnabled()) {
+                log.info("-----------------------响应时间的treemap----------------------");
+            }
             for (Map.Entry<Long, Channel> entry : BrpcBootstrap.ANSWER_TIME_CHANNEL_CACHE.entrySet()) {
                 if (log.isDebugEnabled()) {
                     log.debug("[{}]--->channelId:[{}]", entry.getKey(), entry.getValue().id());
