@@ -8,3 +8,14 @@ logging:
       springframework:
         boot:
           autoconfigure: ERROR
+
+brpc:
+  application-name: brpc-springboot-provider
+  port: 9090
+  registry-url: zookeeper://127.0.0.1:2181
+  data-center-num: 2
+  machine-num: 4
+  load-balancer: com.blazemaple.loadbalancer.impl.ConsistentHashBalancer
+  serialize-type: hessian
+  compress-type: gzip
+  scan-package: com.blazemaple.impl

@@ -1,8 +1,9 @@
 package com.blazemaple.spring;
 
+import com.blazemaple.BrpcConfig;
 import com.blazemaple.annotation.BrpcServiceReference;
-import com.blazemaple.proxy.BrpcProxyFactory;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,10 @@ import java.lang.reflect.Field;
 @Component
 public class BrpcProxyBeanPostProcessor implements BeanPostProcessor {
 
+    @Autowired
+    private BrpcProxyFactory brpcProxyFactory;
+
+
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
         Field[] fields = bean.getClass().getDeclaredFields();
@@ -23,7 +28,7 @@ public class BrpcProxyBeanPostProcessor implements BeanPostProcessor {
             BrpcServiceReference brpcServiceReference = field.getAnnotation(BrpcServiceReference.class);
             if (brpcServiceReference != null) {
                 Class<?> type = field.getType();
-                Object proxy = BrpcProxyFactory.getProxy(type);
+                Object proxy = brpcProxyFactory.getProxy(type);
                 field.setAccessible(true);
                 try {
                     field.set(bean, proxy);

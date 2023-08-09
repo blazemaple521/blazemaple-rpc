@@ -10,6 +10,7 @@ import com.blazemaple.core.HeartbeatDetector;
 import com.blazemaple.discovery.RegistryConfig;
 import com.blazemaple.loadbalancer.LoadBalancer;
 import com.blazemaple.transport.message.BrpcRequest;
+import com.blazemaple.utils.IdGenerator;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -248,6 +249,12 @@ public class BrpcBootstrap {
         return this;
     }
 
+    /**
+     * 获取包下的所有的类名
+     * @param packageName 包名
+     * @return 类名集合
+     */
+
     private List<String> getAllClassNames(String packageName) {
         String basePath = packageName.replaceAll("\\.", "/");
         URL url = ClassLoader.getSystemClassLoader().getResource(basePath);
@@ -261,6 +268,14 @@ public class BrpcBootstrap {
 
         return classNames;
     }
+
+    /**
+     * 递归获取文件夹下的所有的文件
+     * @param absolutePath  绝对路径
+     * @param classNames   类名集合
+     * @param basePath     基础路径
+     * @return 类名集合
+     */
 
     private List<String> recursionFile(String absolutePath, List<String> classNames, String basePath) {
         // 获取文件
@@ -292,6 +307,13 @@ public class BrpcBootstrap {
         return classNames;
     }
 
+    /**
+     * 通过绝对路径获取类的权限定名称
+     * @param absolutePath 绝对路径
+     * @param basePath 基础路径
+     * @return 类的权限定名称
+     */
+
     private String getClassNameByAbsolutePath(String absolutePath, String basePath) {
         String fileName = absolutePath
             .substring(absolutePath.indexOf(basePath.replaceAll("/", "\\\\")))
@@ -301,6 +323,10 @@ public class BrpcBootstrap {
         return fileName;
     }
 
+    /**
+     * 获取配置
+     * @return 配置
+     */
 
     public Configuration getConfiguration() {
         return configuration;
@@ -310,4 +336,26 @@ public class BrpcBootstrap {
         configuration.setGroup(group);
         return this;
     }
+
+    /**
+     * 设置端口
+     * @param port 端口
+     * @return this
+     */
+    public BrpcBootstrap port(int port) {
+        configuration.setPort(port);
+        return this;
+    }
+
+    /**
+     * 设置ID生成器
+     * @param idGenerator id生成器
+     * @return this
+     */
+
+    public BrpcBootstrap idGenerator(IdGenerator idGenerator) {
+        configuration.setIdGenerator(idGenerator);
+        return this;
+    }
+
 }

@@ -26,7 +26,7 @@ public class Configuration {
     private String applicationName = "brpc-default-applicationName";
     private RegistryConfig registryConfig = new RegistryConfig("zookeeper://127.0.0.1:2181");
 
-    private IdGenerator idGenerator = new IdGenerator(1, 2);
+    private IdGenerator idGenerator = new IdGenerator(2, 4);
 
     private LoadBalancer loadBalancer = new RoundRobinLoadBalancer();
 

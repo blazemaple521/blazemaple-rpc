@@ -77,7 +77,6 @@ public class XmlResolver {
             }
 
             configuration.setLoadBalancer(resolveLoadBalancer(doc, xpath));
-            System.out.println("111");
 
         } catch (ParserConfigurationException | SAXException | IOException e) {
             log.info("If no configuration file is found or an exception occurs when parsing the configuration file, " +

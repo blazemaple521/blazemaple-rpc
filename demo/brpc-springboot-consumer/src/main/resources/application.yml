@@ -7,3 +7,12 @@ logging:
       springframework:
         boot:
           autoconfigure: ERROR
+
+
+brpc:
+  application-name: brpc-springboot-consumer
+  registry-url: zookeeper://127.0.0.1:2181
+  serialize-type: hessian
+  compress-type: gzip
+  group: test
+
